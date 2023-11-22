@@ -53,7 +53,8 @@ def addFileNameCol(files):
         data = openFile(files[i])
         # for each data, add filename
         for d in data:
-            d['filename'] = [files[i]]
+            d['filename'] = [files[i][7:]] # [7:] -> remove the 'movies/' part
+            d['occurence'] = 1
         # append to the main list
         all_data = all_data + data
 
@@ -61,13 +62,22 @@ def addFileNameCol(files):
     # convert all_data to dataframe
     df =  pd.DataFrame.from_dict(all_data)
 
-    col = ["title", "description", "url", "publishedAt", "filename"]
+    col = ["title", "description", "url", "publishedAt", "filename", "occurence"]
     filter_col = ["title", "description", "url", "publishedAt"]
     df = df[col]
-    new_df = df.groupby(filter_col).agg(combineFileNameCol)
+    new_df = df.groupby(filter_col).agg(combineFileNameCol).sort_values(by="occurence", ascending=False)
     return new_df
-    # new_df.to_csv('res2.tsv', sep="\t") 
-   
+
+def combineMovieData():
+    # combine files under movies folder into one
+    # get all files under movies(output) folder
+    files_arr = [f for f in os.listdir(output) if os.path.isfile(os.path.join(output, f))]
+    
+    for i in range(len(files_arr)):
+        files_arr[i] = output + '/' + files_arr[i]
+    
+    df = addFileNameCol(files_arr)
+    #df.to_csv('res.tsv', sep="\t")
 
 
 if __name__ == '__main__':
