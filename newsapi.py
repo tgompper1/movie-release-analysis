@@ -4,7 +4,7 @@ import os
 import json
 import pandas as pd
 from functools import reduce
-
+import math
 from datetime import date
 
 API_KEY = "22c05da432d1401a922f84a455e251b7"
@@ -39,6 +39,39 @@ def openFile(input_file):
     with open(input_file) as json_file:
         data = json.load(json_file)
     return data
+
+def selectSomeData(total, df):
+    # randomly select data from each keyword in a proportional way
+    # get all distinct keywords and its count
+    df["keyword"] = df["keyword"].apply(', '.join) # convert list to string
+    df_keyword = df["keyword"].value_counts()
+    keyword_dict = df_keyword.to_dict() #key: keywords(name of movies), value: num of occurence
+    total_data = df.size
+    
+    # calculate the ratio
+    first_key = ""
+    for key in keyword_dict:
+        if first_key == "":
+            first_key = key
+        occurence = keyword_dict[key]
+        # out of 'total_data', 'key' appears 'occurence' times,
+        # if total data is 'total', key will appear '(occurence * total) / total_data' times
+        val = math.ceil((occurence * total) / total_data) 
+        keyword_dict[key] = val  # overwrite with the new val
+    
+    
+    # filter data to be only the first keyword
+    # then randomly select data with amount = keyword_dict[first_key]
+    random_data = df[df["keyword"] == first_key].reset_index().sample(n=keyword_dict[first_key])
+    for key in keyword_dict:
+        if key == first_key:
+            continue
+        cur_data = df[df["keyword"] == key].reset_index().sample(n=keyword_dict[key])
+        random_data = pd.concat([random_data, cur_data], axis=0)  # merge 'cur_data' into 'random_data'
+   
+    # 'random_data' does non contaon exactly 'total' rows bc use math.ceil
+    return random_data.sample(n=total)
+    #print(random_data.sample(n=total))
 
 def combineKeywordCol(series):
     #return reduce(lambda x, y: [x] + [y] if type(x) is not list else x + [y], series)
@@ -80,13 +113,9 @@ def combineMovieData(output):
         files_arr[i] = output + '/' + files_arr[i]
     
     df = addKeywordCol(files_arr)
+    selectSomeData(500, df)
     #df.to_csv('res.tsv', sep="\t")
 
-# def selectData(n, df):
-#     # randomly select data from each keyword in a proportional way
-#     # get all distinct keywords and its count
-
-#     df_keyword = df["keyword"].value_counts()
 
 
 if __name__ == '__main__':
