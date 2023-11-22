@@ -43,11 +43,10 @@ def openFile(input_file):
 def selectSomeData(total, df):
     # randomly select data from each keyword in a proportional way
     # get all distinct keywords and its count
-    df["keyword"] = df["keyword"].apply(', '.join) # convert list to string
+    df["keyword"] = df["keyword"].apply(", ".join) # convert list to string
     df_keyword = df["keyword"].value_counts()
     keyword_dict = df_keyword.to_dict() #key: keywords(name of movies), value: num of occurence
-    total_data = df.size
-    
+    total_data = len(df)
     # calculate the ratio
     first_key = ""
     for key in keyword_dict:
@@ -59,19 +58,20 @@ def selectSomeData(total, df):
         val = math.ceil((occurence * total) / total_data) 
         keyword_dict[key] = val  # overwrite with the new val
     
-    
     # filter data to be only the first keyword
     # then randomly select data with amount = keyword_dict[first_key]
-    random_data = df[df["keyword"] == first_key].reset_index().sample(n=keyword_dict[first_key])
+    random_data = df[df["keyword"] == first_key].sample(n=keyword_dict[first_key])
     for key in keyword_dict:
         if key == first_key:
             continue
-        cur_data = df[df["keyword"] == key].reset_index().sample(n=keyword_dict[key])
+        cur_data = df[df["keyword"] == key].sample(n=keyword_dict[key])
         random_data = pd.concat([random_data, cur_data], axis=0)  # merge 'cur_data' into 'random_data'
    
     # 'random_data' does non contaon exactly 'total' rows bc use math.ceil
-    return random_data.sample(n=total)
-    #print(random_data.sample(n=total))
+    random_data = random_data.sample(n=total)
+    # convert keyword col back to list
+    random_data["keyword"] = random_data["keyword"].apply((lambda x: x.split(", ")))
+    return sortDfOnKeyword(random_data)
 
 def combineKeywordCol(series):
     #return reduce(lambda x, y: [x] + [y] if type(x) is not list else x + [y], series)
@@ -79,6 +79,11 @@ def combineKeywordCol(series):
 
 def keywordColSort(arr):
     return (len(arr), arr)
+
+def sortDfOnKeyword(df):
+    df["sort_by_keyword"] = df["keyword"].apply(keywordColSort)
+    df = df.sort_values(by="sort_by_keyword", ascending=False)
+    return df.drop(columns=["sort_by_keyword"])
 
 def addKeywordCol(files):
     # input is list of files
@@ -99,12 +104,14 @@ def addKeywordCol(files):
     col = ["title", "description", "url", "publishedAt", "keyword"]
     filter_col = ["title", "description", "url", "publishedAt"]
     df = df[col]
-    new_df = df.groupby(filter_col).agg(combineKeywordCol)#.sort_values(by=["keyword", "occurence"], ascending=False)
-    new_df["sort_by_keyword"] = new_df["keyword"].apply(keywordColSort)
-    new_df = new_df.sort_values(by="sort_by_keyword", ascending=False)
-    return new_df.drop(columns=["sort_by_keyword"])
+    new_df = df.groupby(filter_col).agg(combineKeywordCol).reset_index()#.sort_values(by=["keyword", "occurence"], ascending=False)
+   
+    return sortDfOnKeyword(new_df)
+    # new_df["sort_by_keyword"] = new_df["keyword"].apply(keywordColSort)
+    # new_df = new_df.sort_values(by="sort_by_keyword", ascending=False)
+    # return new_df.drop(columns=["sort_by_keyword"])
 
-def combineMovieData(output):
+def combineMovieData(output, total):
     # combine files under movies folder into one
     # get all files under movies(output) folder
     files_arr = [f for f in os.listdir(output) if os.path.isfile(os.path.join(output, f))]
@@ -113,16 +120,18 @@ def combineMovieData(output):
         files_arr[i] = output + '/' + files_arr[i]
     
     df = addKeywordCol(files_arr)
-    selectSomeData(500, df)
-    #df.to_csv('res.tsv', sep="\t")
+    filter_df = selectSomeData(total, df.copy(deep=True))
 
+    # save to file
+    df.to_csv('res_all.tsv', sep="\t", index=False)
+    filter_df.to_csv('res_500.tsv', sep="\t", index=False)
 
 
 if __name__ == '__main__':
     lookback = 30
     output = 'movies'
 
-    combineMovieData(output)
+    combineMovieData(output, 500)
 
 
     # with open(os.path.join(output, "hunger_games"), 'w') as f:
