@@ -138,7 +138,7 @@ if __name__ == '__main__':
     lookback = 30
     output = 'movies'
 
-    combineMovieData(output, 500, "results/res_all.tsv", "results/res_500.tsv")
+    #combineMovieData(output, 500, "results/res_all.tsv", "results/res_500.tsv")
 
     # with open(os.path.join(output, "hunger_games"), 'w') as f:
     #     json.dump(fetch_latest_news(API_KEY, ["The Ballad of Songbirds and Snakes"], lookback), f, indent=4)
