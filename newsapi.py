@@ -41,6 +41,8 @@ def openFile(input_file):
     return data
 
 def selectSomeData(total, df):
+    if total >= len(df):
+        return df
     # randomly select data from each keyword in a proportional way
     # get all distinct keywords and its count
     df["keyword"] = df["keyword"].apply(", ".join) # convert list to string
@@ -53,8 +55,8 @@ def selectSomeData(total, df):
         if first_key == "":
             first_key = key
         occurence = keyword_dict[key]
-        # out of 'total_data', 'key' appears 'occurence' times,
-        # if total data is 'total', key will appear '(occurence * total) / total_data' times
+        # out of <total_data>, <key> appears <occurence> times,
+        # if total data is <total>, key will appear '(occurence * total) / total_data' times
         val = math.ceil((occurence * total) / total_data) 
         keyword_dict[key] = val  # overwrite with the new val
     
@@ -65,16 +67,16 @@ def selectSomeData(total, df):
         if key == first_key:
             continue
         cur_data = df[df["keyword"] == key].sample(n=keyword_dict[key])
-        random_data = pd.concat([random_data, cur_data], axis=0)  # merge 'cur_data' into 'random_data'
+        random_data = pd.concat([random_data, cur_data], axis=0)  # merge <cur_data> into <random_data>
    
-    # 'random_data' does non contaon exactly 'total' rows bc use math.ceil
+    # <random_data> does non contain exactly <total> rows bc use math.ceil
     random_data = random_data.sample(n=total)
     # convert keyword col back to list
     random_data["keyword"] = random_data["keyword"].apply((lambda x: x.split(", ")))
     return sortDfOnKeyword(random_data)
 
 def combineKeywordCol(series):
-    #return reduce(lambda x, y: [x] + [y] if type(x) is not list else x + [y], series)
+    # return reduce(lambda x, y: [x] + [y] if type(x) is not list else x + [y], series)
     return reduce(lambda x, y: x + y, series)
 
 def keywordColSort(arr):
@@ -94,7 +96,8 @@ def addKeywordCol(files):
         data = openFile(files[i])
         # for each data, add filename
         for d in data:
-            d['keyword'] = [files[i][7:]] # [7:] -> remove the 'movies/' part
+            index = files[i].rfind("/") # index of last occurence of "/"
+            d['keyword'] = [files[i][index+1:]] # get only the file name
         # append to the main list
         all_data = all_data + data
 
@@ -104,35 +107,38 @@ def addKeywordCol(files):
     col = ["title", "description", "url", "publishedAt", "keyword"]
     filter_col = ["title", "description", "url", "publishedAt"]
     df = df[col]
-    new_df = df.groupby(filter_col).agg(combineKeywordCol).reset_index()#.sort_values(by=["keyword", "occurence"], ascending=False)
+    new_df = df.groupby(filter_col).agg(combineKeywordCol).reset_index()
    
     return sortDfOnKeyword(new_df)
     # new_df["sort_by_keyword"] = new_df["keyword"].apply(keywordColSort)
     # new_df = new_df.sort_values(by="sort_by_keyword", ascending=False)
     # return new_df.drop(columns=["sort_by_keyword"])
 
-def combineMovieData(output, total):
+def combineMovieData(dataFolder, total, output_file1, output_file2):
     # combine files under movies folder into one
-    # get all files under movies(output) folder
-    files_arr = [f for f in os.listdir(output) if os.path.isfile(os.path.join(output, f))]
-    
+    # output_file1: for all data, output_file2: for <total> number of data
+
+    # get all files under <dataFolder> folder
+    files_arr = [f for f in os.listdir(dataFolder) if os.path.isfile(os.path.join(dataFolder, f))]
     for i in range(len(files_arr)):
-        files_arr[i] = output + '/' + files_arr[i]
+        files_arr[i] = dataFolder + '/' + files_arr[i]
     
     df = addKeywordCol(files_arr)
     filter_df = selectSomeData(total, df.copy(deep=True))
 
+    # create directory if not exist
+    os.makedirs(os.path.dirname(output_file1), exist_ok=True)
+    os.makedirs(os.path.dirname(output_file2), exist_ok=True)
     # save to file
-    df.to_csv('res_all.tsv', sep="\t", index=False)
-    filter_df.to_csv('res_500.tsv', sep="\t", index=False)
+    df.to_csv(output_file1, sep="\t", index=False)
+    filter_df.to_csv(output_file2, sep="\t", index=False)
 
 
 if __name__ == '__main__':
     lookback = 30
     output = 'movies'
 
-    combineMovieData(output, 500)
-
+    combineMovieData(output, 500, "results/res_all.tsv", "results/res_500.tsv")
 
     # with open(os.path.join(output, "hunger_games"), 'w') as f:
     #     json.dump(fetch_latest_news(API_KEY, ["The Ballad of Songbirds and Snakes"], lookback), f, indent=4)
